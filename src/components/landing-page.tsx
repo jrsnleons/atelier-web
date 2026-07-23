@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Feather, Calendar, CheckSquare, Sparkles, Tag, ShieldCheck, ArrowRight, Zap } from 'lucide-react';
 
@@ -9,6 +10,30 @@ interface LandingPageProps {
 
 export function LandingPage({ onGuestAccess }: LandingPageProps) {
   const { signInWithGoogle } = useAuth();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200">
+        <nav className="border-b border-border/60 bg-card/60 backdrop-blur-xs sticky top-0 z-30 px-4 sm:px-8 py-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-accent text-accent-foreground flex items-center justify-center shadow-2xs">
+              <Feather className="w-4 h-4 stroke-[2.5]" />
+            </div>
+            <div>
+              <span className="font-serif font-bold text-lg tracking-tight text-foreground">
+                Atelier
+              </span>
+            </div>
+          </div>
+        </nav>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col font-sans transition-colors duration-200 selection:bg-accent/20">
