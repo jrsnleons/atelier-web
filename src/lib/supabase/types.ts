@@ -13,6 +13,7 @@ export interface CalendarFeed {
   color: string;     // Hex or Tailwind color token, e.g. "#3b82f6"
   url: string;       // Google Calendar iCal secret URL
   enabled: boolean;
+  category_id?: string | null; // Linked Category/List ID or Name
   last_synced_at?: string;
 }
 

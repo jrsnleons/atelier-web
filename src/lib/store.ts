@@ -71,6 +71,7 @@ export class DataStore {
           color: feed.color,
           url: feed.url,
           enabled: feed.enabled,
+          category_id: feed.category_id,
         });
       } catch (e) {
         console.warn('Supabase feed save error:', e);

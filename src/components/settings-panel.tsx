@@ -59,6 +59,8 @@ export function SettingsPanel({
 }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<'categories' | 'calendars' | 'theme' | 'shortcuts' | 'about'>('categories');
 
+  const [feedCategory, setFeedCategory] = useState<string>('');
+
   // Calendar Feed Form State
   const [showFeedForm, setShowFeedForm] = useState(false);
   const [editingFeedId, setEditingFeedId] = useState<string | null>(null);
@@ -81,6 +83,7 @@ export function SettingsPanel({
     setEditingFeedId(null);
     setFeedName('');
     setFeedColor('#3b82f6');
+    setFeedCategory('');
     setFeedUrl('');
     setPresetLabel('');
     setShowFeedForm(true);
@@ -90,6 +93,7 @@ export function SettingsPanel({
     setEditingFeedId(feed.id);
     setFeedName(feed.name);
     setFeedColor(feed.color);
+    setFeedCategory(feed.category_id || '');
     setFeedUrl(feed.url);
     setPresetLabel(feed.name);
     setShowFeedForm(true);
@@ -111,6 +115,7 @@ export function SettingsPanel({
         id: editingFeedId,
         name: feedName.trim(),
         color: feedColor,
+        category_id: feedCategory || null,
         url: feedUrl.trim(),
         enabled: existing ? existing.enabled : true,
       };
@@ -120,6 +125,7 @@ export function SettingsPanel({
         id: 'feed_' + Math.random().toString(36).substring(2, 9),
         name: feedName.trim(),
         color: feedColor,
+        category_id: feedCategory || null,
         url: feedUrl.trim(),
         enabled: true,
       };
@@ -128,6 +134,7 @@ export function SettingsPanel({
 
     setFeedName('');
     setFeedUrl('');
+    setFeedCategory('');
     setEditingFeedId(null);
     setShowFeedForm(false);
   };
@@ -674,6 +681,32 @@ export function SettingsPanel({
                         </span>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Linked Category Dropdown */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-muted-foreground font-medium">
+                      Link to Category / List (Optional)
+                    </label>
+                    <select
+                      value={feedCategory}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFeedCategory(val);
+                        const foundList = lists.find((l) => l.name === val || l.id === val);
+                        if (foundList) {
+                          setFeedColor(foundList.color);
+                        }
+                      }}
+                      className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+                    >
+                      <option value="">None (Independent Calendar)</option>
+                      {lists.map((l) => (
+                        <option key={l.id} value={l.name}>
+                          {l.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* URL */}

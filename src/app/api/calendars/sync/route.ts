@@ -48,6 +48,8 @@ export async function POST(request: Request) {
               start_time: ev.startTime24,
               end_time: ev.endTime24,
               priority: 0,
+              list_id: feed.category_id || feed.name,
+              list_tag: feed.category_id || feed.name,
               is_external: true,
               calendar_id: feed.id,
               calendar_name: feed.name,
