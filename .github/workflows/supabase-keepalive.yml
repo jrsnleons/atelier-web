@@ -1,0 +1,18 @@
+name: Supabase Keep-Alive Ping
+
+on:
+  schedule:
+    # Run every 5 days at 00:00 UTC to guarantee Supabase never pauses
+    - cron: '0 0 */5 * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Database
+        run: |
+          curl -s "${{ secrets.SUPABASE_URL }}/rest/v1/notes?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
+          echo "Supabase keep-alive ping complete!"
