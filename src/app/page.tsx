@@ -469,6 +469,7 @@ export default function Home() {
 
   // Handler for Scratchpad Note Save
   const handleSaveNoteContent = async (content: any) => {
+    setNote({ date: currentDateStr, content });
     await store.saveNote(currentDateStr, content);
   };
 

@@ -115,12 +115,26 @@ export function Scratchpad({ dateStr, initialContent, onSaveContent }: Scratchpa
     },
   });
 
-  // Re-hydrate content when dateStr changes
+  // Re-hydrate content when dateStr changes or when initialContent loads asynchronously
+  const previousDateRef = useRef<string>(dateStr);
+
   useEffect(() => {
-    if (editor) {
+    if (!editor) return;
+
+    const dateChanged = previousDateRef.current !== dateStr;
+    if (dateChanged) {
+      previousDateRef.current = dateStr;
       editor.commands.setContent(initialContent || '');
+      return;
     }
-  }, [dateStr]);
+
+    if (!editor.isFocused && initialContent) {
+      const currentText = editor.getText().trim();
+      if (!currentText) {
+        editor.commands.setContent(initialContent);
+      }
+    }
+  }, [dateStr, initialContent, editor]);
 
   const handleShareClick = () => {
     if (editor && typeof navigator !== 'undefined' && navigator.clipboard) {
