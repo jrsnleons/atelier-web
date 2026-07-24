@@ -5,6 +5,7 @@
 
 ## ✅ Completed Steps
 - [x] **[REALTIME & MULTI-BROWSER SYNC] Fixed Agenda & Daily Note Syncing**:
+  - Removed PWA Service Worker (`public/sw.js`) and added automatic Service Worker unregistration script to clear stale browser cache
   - Replaced non-UUID string IDs with PostgreSQL valid UUIDs (`ensureUUID()`) across tasks, events, and demo data
   - Fixed `notes` table upsert `onConflict` clause (`user_id, date`) in `DataStore`
   - Fixed Daily Note page-refresh rehydration bug in `Scratchpad.tsx` when `initialContent` loads asynchronously
