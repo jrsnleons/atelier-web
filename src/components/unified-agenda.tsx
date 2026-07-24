@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Task, Event, ListCategory } from '@/lib/supabase/types';
+import { useState, useEffect, useRef } from 'react';
+import { Task, Event, ListCategory, SubTask } from '@/lib/supabase/types';
 import { DEFAULT_LISTS, getListColor, getListName } from '@/lib/lists';
-import { Calendar, Plus, ChevronsUpDown, Clock, CheckCircle2, Circle, Trash2, Pencil, Tag } from 'lucide-react';
+import { Calendar, Plus, ChevronsUpDown, Clock, CheckCircle2, Circle, Trash2, Pencil, Tag, ListChecks, CheckSquare, Square, Filter, ChevronDown, Check } from 'lucide-react';
 
 interface UnifiedAgendaProps {
   tasks: Task[];
@@ -14,6 +14,7 @@ interface UnifiedAgendaProps {
   onDeleteEvent: (id: string) => void;
   onEditItem: (item: Task | Event) => void;
   onOpenAddModal: () => void;
+  onSaveTask?: (task: Task) => void;
   lists?: ListCategory[];
 }
 
@@ -26,15 +27,30 @@ export function UnifiedAgenda({
   onDeleteEvent,
   onEditItem,
   onOpenAddModal,
+  onSaveTask,
   lists = DEFAULT_LISTS,
 }: UnifiedAgendaProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeListFilter, setActiveListFilter] = useState<string>('all');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setIsFilterOpen(false);
+      }
+    };
+    if (isFilterOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isFilterOpen]);
 
   // Filter tasks & events by active category list filter
   const matchesFilter = (item: Task | Event) => {
@@ -94,10 +110,83 @@ export function UnifiedAgenda({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Clean Category Filter Popover Dropdown Button */}
+          <div ref={filterRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              className={`p-1.5 px-2.5 rounded-lg border transition-all flex items-center gap-1.5 text-xs font-semibold active:scale-95 ${
+                activeListFilter !== 'all'
+                  ? 'bg-accent/15 border-accent/40 text-accent font-bold ring-1 ring-accent/30'
+                  : 'bg-muted/40 border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/70'
+              }`}
+              title="Filter by Category"
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span className="capitalize">
+                {activeListFilter === 'all'
+                  ? 'All'
+                  : lists.find((l) => l.name.toLowerCase() === activeListFilter)?.name || activeListFilter}
+              </span>
+              <ChevronDown className={`w-3 h-3 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Filter Dropdown Popover */}
+            {isFilterOpen && (
+              <div className="absolute right-0 top-full mt-1.5 z-40 bg-card dark:bg-[#1E1C1A] border border-border/80 rounded-xl p-1.5 shadow-xl w-48 ring-1 ring-white/10 animate-in zoom-in-95 fade-in duration-150 space-y-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveListFilter('all');
+                    setIsFilterOpen(false);
+                  }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg font-medium transition-colors flex items-center justify-between ${
+                    activeListFilter === 'all'
+                      ? 'bg-accent/20 text-accent font-bold'
+                      : 'hover:bg-muted/60 text-foreground'
+                  }`}
+                >
+                  <span>All Categories</span>
+                  {activeListFilter === 'all' && <Check className="w-3.5 h-3.5 text-accent" />}
+                </button>
+
+                <div className="my-1 border-t border-border/40" />
+
+                {lists.map((l) => {
+                  const isActive = activeListFilter.toLowerCase() === l.name.toLowerCase();
+                  return (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveListFilter(l.name.toLowerCase());
+                        setIsFilterOpen(false);
+                      }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg font-medium transition-colors flex items-center justify-between ${
+                        isActive
+                          ? 'bg-accent/20 text-accent font-bold'
+                          : 'hover:bg-muted/60 text-foreground'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: l.color }}
+                        />
+                        {l.name}
+                      </span>
+                      {isActive && <Check className="w-3.5 h-3.5 text-accent" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Collapse/Expand Toggle */}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+            className="p-1.5 rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors active:scale-95"
             title={isCollapsed ? 'Expand Agenda' : 'Collapse Agenda'}
           >
             <ChevronsUpDown className="w-4 h-4" />
@@ -106,47 +195,12 @@ export function UnifiedAgenda({
           {/* Plus Add Button */}
           <button
             onClick={onOpenAddModal}
-            className="p-1.5 rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity shadow-2xs flex items-center justify-center"
+            className="p-1.5 rounded-lg bg-accent text-accent-foreground hover:opacity-90 transition-opacity shadow-2xs flex items-center justify-center active:scale-95"
             title="Add Event or Task (+)"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
           </button>
         </div>
-      </div>
-
-      {/* Category List Filter Bar: [ All | Work | Personal | Health | Study ] */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-        <button
-          onClick={() => setActiveListFilter('all')}
-          className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 ${
-            activeListFilter === 'all'
-              ? 'bg-foreground text-background font-bold shadow-2xs'
-              : 'bg-muted/50 text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          All
-        </button>
-
-        {lists.map((l) => {
-          const isActive = activeListFilter.toLowerCase() === l.name.toLowerCase();
-          return (
-            <button
-              key={l.id}
-              onClick={() => setActiveListFilter(l.name.toLowerCase())}
-              className={`px-2.5 py-1 rounded-lg font-medium transition-all shrink-0 flex items-center gap-1.5 ${
-                isActive
-                  ? 'bg-accent/20 text-accent font-bold ring-1 ring-accent/40'
-                  : 'bg-muted/50 text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <span
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: l.color }}
-              />
-              {l.name}
-            </button>
-          );
-        })}
       </div>
 
       {!isCollapsed && (
@@ -200,7 +254,7 @@ export function UnifiedAgenda({
                             {task.text}
                           </p>
 
-                          <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
+                          <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
                             {task.priority === 1 ? (
                               <span className="text-red-600 dark:text-red-400 font-semibold">Overdue</span>
                             ) : (
@@ -216,7 +270,51 @@ export function UnifiedAgenda({
                                 {tagName}
                               </span>
                             )}
+
+                            {/* Subtask Progress Badge */}
+                            {task.subtasks && task.subtasks.length > 0 && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md font-mono text-[10px] bg-accent/15 text-accent font-semibold">
+                                <ListChecks className="w-3 h-3" />
+                                {task.subtasks.filter((s) => s.is_done).length}/{task.subtasks.length}
+                              </span>
+                            )}
                           </div>
+
+                          {/* Nested Sub-task Checklist */}
+                          {task.subtasks && task.subtasks.length > 0 && (
+                            <div className="mt-2 space-y-1 pl-1 border-l-2 border-accent/20">
+                              {task.subtasks.map((st) => (
+                                <div key={st.id} className="flex items-center gap-2 text-xs py-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (onSaveTask) {
+                                        const updatedSubtasks = task.subtasks!.map((s) =>
+                                          s.id === st.id ? { ...s, is_done: !s.is_done } : s
+                                        );
+                                        const allDone = updatedSubtasks.every((s) => s.is_done);
+                                        onSaveTask({
+                                          ...task,
+                                          subtasks: updatedSubtasks,
+                                          is_done: allDone ? true : task.is_done,
+                                        });
+                                      }
+                                    }}
+                                    className="text-muted-foreground hover:text-accent transition-colors shrink-0"
+                                  >
+                                    {st.is_done ? (
+                                      <CheckSquare className="w-3.5 h-3.5 text-accent" />
+                                    ) : (
+                                      <Square className="w-3.5 h-3.5 text-muted-foreground/60" />
+                                    )}
+                                  </button>
+                                  <span className={`break-words ${st.is_done ? 'line-through text-muted-foreground/60' : 'text-foreground/90'}`}>
+                                    {st.text}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
 

@@ -26,7 +26,7 @@ export class DataStore {
     if (supabase) {
       try {
         const { data, error } = await supabase.from('calendar_feeds').select('*');
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
           return data as CalendarFeed[];
         }
       } catch (e) {
@@ -71,7 +71,6 @@ export class DataStore {
           color: feed.color,
           url: feed.url,
           enabled: feed.enabled,
-          category_id: feed.category_id,
         });
       } catch (e) {
         console.warn('Supabase feed save error:', e);
@@ -292,6 +291,7 @@ export class DataStore {
           start_time: task.start_time,
           end_time: task.end_time,
           sort_order: task.sort_order ?? 0,
+          subtasks: task.subtasks || [],
         });
       } catch (e) {
         console.warn('Supabase task save error:', e);
@@ -398,6 +398,146 @@ export class DataStore {
       }
     }
   }
+  // --- WORKSPACE DATA EXPORT ---
+  public async exportAllData(): Promise<{
+    notes: Note[];
+    tasks: Task[];
+    events: Event[];
+    lists: ListCategory[];
+  }> {
+    const supabase = this.getSupabase();
+    let notes: Note[] = [];
+    let tasks: Task[] = [];
+    let events: Event[] = [];
+    let lists: ListCategory[] = await this.getLists();
+
+    if (supabase) {
+      try {
+        const [nRes, tRes, eRes] = await Promise.all([
+          supabase.from('notes').select('*'),
+          supabase.from('tasks').select('*'),
+          supabase.from('events').select('*'),
+        ]);
+        if (nRes.data) notes = nRes.data as Note[];
+        if (tRes.data) tasks = tRes.data as Task[];
+        if (eRes.data) events = eRes.data as Event[];
+      } catch (e) {
+        console.warn('Supabase export fetch error, falling back to localStorage:', e);
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !key.startsWith(STORAGE_PREFIX)) continue;
+
+        try {
+          const raw = localStorage.getItem(key);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw);
+
+          if (key.startsWith(`${STORAGE_PREFIX}note_`)) {
+            const dateStr = key.replace(`${STORAGE_PREFIX}note_`, '');
+            if (!notes.some((n) => n.date === dateStr)) {
+              notes.push(typeof parsed === 'object' ? parsed : { date: dateStr, content: parsed });
+            }
+          } else if (key.startsWith(`${STORAGE_PREFIX}tasks_`)) {
+            if (Array.isArray(parsed)) {
+              parsed.forEach((t: Task) => {
+                if (!tasks.some((existing) => existing.id === t.id)) {
+                  tasks.push(t);
+                }
+              });
+            }
+          } else if (key.startsWith(`${STORAGE_PREFIX}events_`)) {
+            if (Array.isArray(parsed)) {
+              parsed.forEach((ev: Event) => {
+                if (!events.some((existing) => existing.id === ev.id)) {
+                  events.push(ev);
+                }
+              });
+            }
+          }
+        } catch {
+          // Skip unparseable
+        }
+      }
+    }
+
+    return { notes, tasks, events, lists };
+  }
+
+  public async exportAsMarkdown(): Promise<string> {
+    const data = await this.exportAllData();
+    let md = `# Atelier Workspace Journal & Export\n*Exported on ${new Date().toLocaleDateString()}*\n\n`;
+
+    // 1. Daily Notes
+    md += `## 📓 Daily Notes\n\n`;
+    if (data.notes.length === 0) {
+      md += `*No daily notes recorded.*\n\n`;
+    } else {
+      const sortedNotes = [...data.notes].sort((a, b) => b.date.localeCompare(a.date));
+      sortedNotes.forEach((note) => {
+        md += `### ${note.date}\n`;
+        if (typeof note.content === 'string') {
+          md += `${note.content}\n\n`;
+        } else if (note.content && typeof note.content === 'object') {
+          // Extract text from Tiptap JSON if available
+          const text = extractTextFromTiptapJson(note.content);
+          md += `${text || '*[Rich Text Content]*'}\n\n`;
+        } else {
+          md += `*[Empty Note]*\n\n`;
+        }
+      });
+    }
+
+    // 2. Tasks
+    md += `## ✅ Tasks Archive\n\n`;
+    if (data.tasks.length === 0) {
+      md += `*No tasks recorded.*\n\n`;
+    } else {
+      const sortedTasks = [...data.tasks].sort((a, b) => b.date.localeCompare(a.date));
+      sortedTasks.forEach((task) => {
+        const checkbox = task.is_done ? '[x]' : '[ ]';
+        const category = task.list_tag ? ` #${task.list_tag}` : '';
+        const priority = task.priority > 0 ? ` (!${task.priority})` : '';
+        const time = task.start_time ? ` @ ${task.start_time}` : '';
+        md += `- ${checkbox} **${task.text}** (${task.date}${time})${category}${priority}\n`;
+        if (task.subtasks && task.subtasks.length > 0) {
+          task.subtasks.forEach((sub) => {
+            const subBox = sub.is_done ? '[x]' : '[ ]';
+            md += `  - ${subBox} ${sub.text}\n`;
+          });
+        }
+      });
+      md += `\n`;
+    }
+
+    // 3. Events
+    md += `## 📅 Events\n\n`;
+    if (data.events.length === 0) {
+      md += `*No events recorded.*\n\n`;
+    } else {
+      const sortedEvents = [...data.events].sort((a, b) => b.date.localeCompare(a.date));
+      sortedEvents.forEach((ev) => {
+        md += `- **${ev.text}** (${ev.date} at ${ev.start_time}${ev.end_time ? ` - ${ev.end_time}` : ''})\n`;
+      });
+      md += `\n`;
+    }
+
+    return md;
+  }
+}
+
+// Helper to extract text from Tiptap JSON node structure
+function extractTextFromTiptapJson(node: any): string {
+  if (!node) return '';
+  if (typeof node === 'string') return node;
+  if (node.type === 'text') return node.text || '';
+  if (Array.isArray(node.content)) {
+    return node.content.map(extractTextFromTiptapJson).join('\n');
+  }
+  return '';
 }
 
 export const store = DataStore.getInstance();

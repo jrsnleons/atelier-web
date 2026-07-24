@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { CalendarFeed, ListCategory } from '@/lib/supabase/types';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { CustomColorPicker } from '@/components/custom-color-picker';
 import {
   X,
   Settings,
@@ -19,6 +20,7 @@ import {
   Pencil,
   Tag,
   Feather,
+  Download,
 } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -32,6 +34,7 @@ interface SettingsPanelProps {
   lists: ListCategory[];
   onSaveList: (list: ListCategory) => void;
   onDeleteList: (id: string) => void;
+  onOpenExport?: () => void;
 }
 
 const PRESET_COLORS = [
@@ -56,6 +59,7 @@ export function SettingsPanel({
   lists,
   onSaveList,
   onDeleteList,
+  onOpenExport,
 }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<'categories' | 'calendars' | 'theme' | 'shortcuts' | 'about'>('categories');
 
@@ -206,10 +210,10 @@ export function SettingsPanel({
 
         {/* Tab Navigation Pill Bar */}
         <div className="px-6 pt-4 pb-2 border-b border-border/40 bg-muted/10">
-          <div className="bg-muted/60 p-1 rounded-xl flex items-center gap-1 text-xs font-medium overflow-x-auto no-scrollbar">
+          <div className="bg-muted/60 p-1 rounded-xl flex flex-wrap items-center gap-1 text-xs font-medium">
             <button
               onClick={() => setActiveTab('categories')}
-              className={`flex-1 py-1.5 px-2 rounded-lg transition-all flex items-center justify-center gap-1.5 shrink-0 ${
+              className={`flex-1 min-w-[90px] py-1.5 px-2 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
                 activeTab === 'categories'
                   ? 'bg-background text-foreground shadow-2xs font-semibold'
                   : 'text-muted-foreground hover:text-foreground'
@@ -379,43 +383,12 @@ export function SettingsPanel({
                     />
                   </div>
 
-                  {/* Color Picker & Presets */}
-                  <div className="space-y-2">
-                    <label className="text-[11px] text-muted-foreground font-medium">
+                  {/* Custom Color Picker */}
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-muted-foreground font-medium block">
                       Color Theme
                     </label>
-                    <div className="flex flex-wrap gap-2 items-center">
-                      {PRESET_COLORS.map((c) => (
-                        <button
-                          key={c.hex}
-                          type="button"
-                          onClick={() => setListColor(c.hex)}
-                          className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
-                            listColor.toLowerCase() === c.hex.toLowerCase()
-                              ? 'ring-2 ring-accent ring-offset-2 ring-offset-background scale-110'
-                              : 'hover:scale-105'
-                          }`}
-                          style={{ backgroundColor: c.hex }}
-                          title={c.name}
-                        >
-                          {listColor.toLowerCase() === c.hex.toLowerCase() && (
-                            <Check className="w-3 h-3 text-white" />
-                          )}
-                        </button>
-                      ))}
-
-                      <div className="flex items-center gap-1 ml-auto">
-                        <input
-                          type="color"
-                          value={listColor}
-                          onChange={(e) => setListColor(e.target.value)}
-                          className="w-7 h-7 rounded border border-border cursor-pointer bg-transparent"
-                        />
-                        <span className="text-[10px] font-mono text-muted-foreground uppercase">
-                          {listColor}
-                        </span>
-                      </div>
-                    </div>
+                    <CustomColorPicker color={listColor} onChange={setListColor} />
                   </div>
 
                   <div className="flex items-center justify-end gap-2 pt-1">
@@ -811,6 +784,27 @@ export function SettingsPanel({
               <p>
                 Atelier is a minimal, quiet daily planner & journal inspired by Christopher Lawley. Built with local-first architecture, multi-calendar support, and 100% offline capability.
               </p>
+
+              {/* Data Portability Section */}
+              {onOpenExport && (
+                <div className="p-3.5 bg-accent/10 border border-accent/30 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h5 className="font-bold text-foreground text-xs">Data Portability & Backup</h5>
+                      <p className="text-[11px] text-muted-foreground">Export notes & tasks as Markdown or raw JSON</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        onClose();
+                        onOpenExport();
+                      }}
+                      className="px-3 py-1.5 bg-accent text-accent-foreground rounded-lg font-bold text-xs shadow-2xs hover:opacity-90 transition-opacity flex items-center gap-1.5"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Export Data
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-2 border-t border-border/40 flex items-center justify-between text-[11px]">
                 <span>Synced locally & privately</span>

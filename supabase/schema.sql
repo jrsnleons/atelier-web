@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   start_time TIME DEFAULT NULL,
   end_time TIME DEFAULT NULL,
   sort_order SMALLINT DEFAULT 0,
+  subtasks JSONB DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );

@@ -6,12 +6,20 @@ import { formatDateISO } from './nlp-parser';
 interface KeyboardProps {
   currentDateStr: string;
   onDateChange: (dateStr: string) => void;
+  onOpenAddModal?: () => void;
 }
 
-export function useGlobalKeyboard({ currentDateStr, onDateChange }: KeyboardProps) {
+export function useGlobalKeyboard({ currentDateStr, onDateChange, onOpenAddModal }: KeyboardProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger day navigation shortcuts when typing in an input or contenteditable area
+      // Check if user pressed Cmd+K or Ctrl+K anywhere (even inside editor/input)
+      if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        onOpenAddModal?.();
+        return;
+      }
+
+      // Don't trigger single-key shortcuts when typing in an input or contenteditable area
       const activeEl = document.activeElement;
       const isEditing =
         activeEl?.tagName === 'INPUT' ||
@@ -20,6 +28,12 @@ export function useGlobalKeyboard({ currentDateStr, onDateChange }: KeyboardProp
         activeEl?.classList.contains('ProseMirror');
 
       if (isEditing) return;
+
+      if (e.key === '/') {
+        e.preventDefault();
+        onOpenAddModal?.();
+        return;
+      }
 
       const [y, m, d] = currentDateStr.split('-').map(Number);
       const currDate = new Date(y, m - 1, d);
@@ -40,5 +54,5 @@ export function useGlobalKeyboard({ currentDateStr, onDateChange }: KeyboardProp
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentDateStr, onDateChange]);
+  }, [currentDateStr, onDateChange, onOpenAddModal]);
 }

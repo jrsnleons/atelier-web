@@ -51,23 +51,28 @@ export function NLPModal({ isOpen, onClose, currentDateStr, onAddItem }: NLPModa
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
       role="dialog"
       aria-modal="true"
     >
-      <div className="bg-card dark:bg-[#1E1C1A] border border-border/80 dark:border-border/60 rounded-2xl max-w-md w-full shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] overflow-hidden animate-in zoom-in-95 duration-150 ring-1 ring-white/10">
+      <div className="bg-card dark:bg-[#1E1C1A] border border-border/80 dark:border-border/60 rounded-2xl max-w-md w-full shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] overflow-hidden animate-in fade-in slide-in-from-bottom-4 zoom-in-95 duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ring-1 ring-white/10">
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          {/* Segmented Tab Bar: [ Event | Task ] */}
-          <div className="bg-muted/70 dark:bg-muted/40 p-1 rounded-xl flex items-center text-xs font-semibold border border-border/40">
+          {/* Segmented Tab Bar: [ Event | Task ] with smooth sliding pill */}
+          <div className="relative bg-muted/70 dark:bg-muted/40 p-1 rounded-xl flex items-center text-xs font-semibold border border-border/40 overflow-hidden">
+            {/* Animated Sliding Background Indicator */}
+            <div
+              className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-background dark:bg-[#25221F] rounded-lg shadow-2xs border border-border/60 transition-transform duration-200 ease-out ${
+                activeTab === 'task' ? 'translate-x-[calc(100%+4px)]' : 'translate-x-0'
+              }`}
+            />
+
             <button
               type="button"
               onClick={() => setActiveTab('event')}
-              className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === 'event'
-                  ? 'bg-background text-foreground shadow-xs font-bold'
-                  : 'text-muted-foreground hover:text-foreground'
+              className={`relative z-10 flex-1 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 active:scale-95 ${
+                activeTab === 'event' ? 'text-foreground font-bold' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <Calendar className="w-3.5 h-3.5" /> Event
@@ -76,10 +81,8 @@ export function NLPModal({ isOpen, onClose, currentDateStr, onAddItem }: NLPModa
             <button
               type="button"
               onClick={() => setActiveTab('task')}
-              className={`flex-1 py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-                activeTab === 'task'
-                  ? 'bg-background text-foreground shadow-xs font-bold'
-                  : 'text-muted-foreground hover:text-foreground'
+              className={`relative z-10 flex-1 py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5 active:scale-95 ${
+                activeTab === 'task' ? 'text-foreground font-bold' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               <CheckSquare className="w-3.5 h-3.5" /> Task
@@ -133,7 +136,7 @@ export function NLPModal({ isOpen, onClose, currentDateStr, onAddItem }: NLPModa
 
           {/* Live Parsing Preview Chip */}
           {parsed && (
-            <div className="p-3 bg-muted/50 border border-border/60 rounded-xl text-xs space-y-1 font-mono">
+            <div className="p-3 bg-muted/50 border border-border/60 rounded-xl text-xs space-y-1 font-mono animate-in fade-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between text-muted-foreground text-[11px]">
                 <span className="flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-accent" /> Parsed Details:

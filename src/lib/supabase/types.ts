@@ -25,6 +25,12 @@ export interface Note {
   updated_at?: string;
 }
 
+export interface SubTask {
+  id: string;
+  text: string;
+  is_done: boolean;
+}
+
 export interface Task {
   id: string;
   date: string; // YYYY-MM-DD
@@ -36,6 +42,7 @@ export interface Task {
   start_time?: string | null; // HH:MM (if scheduled)
   end_time?: string | null;   // HH:MM (if scheduled)
   sort_order?: number;
+  subtasks?: SubTask[];
   created_at?: string;
   updated_at?: string;
 }

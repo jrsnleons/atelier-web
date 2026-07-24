@@ -11,6 +11,7 @@ import { Scratchpad } from '@/components/scratchpad';
 import { NLPModal } from '@/components/nlp-modal';
 import { TaskEditSheet } from '@/components/task-edit-sheet';
 import { SettingsPanel } from '@/components/settings-panel';
+import { ExportModal } from '@/components/export-modal';
 import { OfflineIndicator } from '@/components/offline-indicator';
 import { PWAInstaller } from '@/components/pwa-installer';
 import { LandingPage } from '@/components/landing-page';
@@ -18,7 +19,7 @@ import { UserMenu } from '@/components/user-menu';
 import { useAuth } from '@/lib/auth-context';
 import { migrateLocalDataToCloud } from '@/lib/migration';
 import { useGlobalKeyboard } from '@/lib/keyboard';
-import { Feather } from 'lucide-react';
+import { Feather, Plus } from 'lucide-react';
 
 export default function Home() {
   const { user } = useAuth();
@@ -29,8 +30,10 @@ export default function Home() {
   const [events, setEvents] = useState<Event[]>([]);
   const [feeds, setFeeds] = useState<CalendarFeed[]>([]);
   const [lists, setLists] = useState<ListCategory[]>([]);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isNLPModalOpen, setIsNLPModalOpen] = useState(false);
+
+  const [isNLPModalOpen, setIsNLPModalOpen] = useState<boolean>(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [isSyncingFeeds, setIsSyncingFeeds] = useState(false);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -45,10 +48,11 @@ export default function Home() {
     }
   }, [user?.id]);
 
-  // Hook global keyboard shortcuts
+  // Hook global keyboard shortcuts (/ and Cmd+K open Add Modal)
   useGlobalKeyboard({
     currentDateStr,
     onDateChange: setCurrentDateStr,
+    onOpenAddModal: () => setIsNLPModalOpen(true),
   });
 
   // Sync external Google Calendar feeds for a date
@@ -306,26 +310,48 @@ export default function Home() {
     const externalEvents = await syncExternalFeeds(currentDateStr, feeds);
     const localEvents = await store.getEvents(currentDateStr);
     setEvents([...localEvents, ...externalEvents].sort((a, b) => a.start_time.localeCompare(b.start_time)));
-  };
-
-  // Handlers for Smart NLP Input Modal: Save all user-created items as Tasks (scheduled or untimed)
+  };  // Handlers for Smart NLP Input Modal: Save items as Tasks or Events based on tab selection
   const handleAddItem = async (item: ParsedItem) => {
     const targetDateStr = item.targetDate || currentDateStr;
 
-    const newTask: Task = {
-      id: 'tsk_' + Math.random().toString(36).substring(2, 9),
-      date: targetDateStr,
-      text: item.text,
-      priority: item.priority,
-      list_tag: item.listTag,
-      is_done: false,
-      start_time: item.startTime || null,
-      end_time: item.endTime || null,
-    };
+    if (item.type === 'event') {
+      const activeFeed = feeds.find((f) => f.enabled) || feeds[0];
+      const newEvent: Event = {
+        id: 'evt_' + Math.random().toString(36).substring(2, 9),
+        date: targetDateStr,
+        text: item.text,
+        start_time: item.startTime || '09:00',
+        end_time: item.endTime || null,
+        priority: item.priority,
+        list_tag: item.listTag || null,
+        list_id: item.listTag || null,
+        calendar_name: activeFeed?.name || 'Personal',
+        calendar_color: activeFeed?.color || '#10b981',
+        is_external: false,
+      };
 
-    await store.saveTask(newTask);
-    if (targetDateStr === currentDateStr) {
-      setTasks((prev) => [...prev, newTask]);
+      await store.saveEvent(newEvent);
+      if (targetDateStr === currentDateStr) {
+        setEvents((prev) =>
+          [...prev, newEvent].sort((a, b) => a.start_time.localeCompare(b.start_time))
+        );
+      }
+    } else {
+      const newTask: Task = {
+        id: 'tsk_' + Math.random().toString(36).substring(2, 9),
+        date: targetDateStr,
+        text: item.text,
+        priority: item.priority,
+        list_tag: item.listTag,
+        is_done: false,
+        start_time: item.startTime || null,
+        end_time: item.endTime || null,
+      };
+
+      await store.saveTask(newTask);
+      if (targetDateStr === currentDateStr) {
+        setTasks((prev) => [...prev, newTask]);
+      }
     }
   };
 
@@ -449,6 +475,7 @@ export default function Home() {
               onDeleteEvent={(id) => handleDeleteEvent(id, currentDateStr)}
               onEditItem={(item) => setEditingItem(item)}
               onOpenAddModal={() => setIsNLPModalOpen(true)}
+              onSaveTask={(updatedTask) => handleSaveUpdatedTask(updatedTask)}
               lists={lists}
             />
           </div>
@@ -482,6 +509,7 @@ export default function Home() {
         onDeleteTask={handleDeleteTask}
         onDeleteEvent={handleDeleteEvent}
         lists={lists}
+        feeds={feeds}
       />
 
       {/* Offline Status Indicator */}
@@ -499,7 +527,23 @@ export default function Home() {
         lists={lists}
         onSaveList={handleSaveList}
         onDeleteList={handleDeleteList}
+        onOpenExport={() => setIsExportOpen(true)}
       />
+
+      {/* One-Click Workspace Export Modal */}
+      <ExportModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+      />
+
+      {/* Mobile Quick Floating Action Button (FAB) */}
+      <button
+        onClick={() => setIsNLPModalOpen(true)}
+        className="sm:hidden fixed bottom-6 right-6 z-40 p-4 bg-accent text-accent-foreground rounded-full shadow-[0_10px_25px_-5px_rgba(0,0,0,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center ring-1 ring-white/20"
+        title="Quick Add Item (+)"
+      >
+        <Plus className="w-6 h-6 stroke-[2.5]" />
+      </button>
 
       {/* Keyboard Shortcuts Footer Bar */}
       <footer className="border-t border-border/40 py-3 px-4 text-center text-xs text-muted-foreground/80 bg-card/30 flex flex-wrap items-center justify-center gap-4 font-mono">
