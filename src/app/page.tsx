@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { formatDateISO, ParsedItem } from '@/lib/nlp-parser';
-import { store } from '@/lib/store';
+import { store, ensureUUID } from '@/lib/store';
+import { createClient } from '@/lib/supabase/client';
 import { Task, Event, Note, CalendarFeed, ListCategory } from '@/lib/supabase/types';
 
 import { DateNav } from '@/components/date-nav';
@@ -154,7 +155,7 @@ export default function Home() {
 
         const demoTasks: Task[] = [
           {
-            id: 'demo_t1',
+            id: ensureUUID(),
             date: dateStr,
             text: 'Finish Parchment Marketing Materials',
             priority: 0,
@@ -162,7 +163,7 @@ export default function Home() {
             is_done: false,
           },
           {
-            id: 'demo_t2',
+            id: ensureUUID(),
             date: dateStr,
             text: 'Publish New TestFlight Version',
             priority: 1,
@@ -170,7 +171,7 @@ export default function Home() {
             is_done: false,
           },
           {
-            id: 'demo_t3',
+            id: ensureUUID(),
             date: dateStr,
             text: 'Review pull requests',
             priority: 0,
@@ -178,7 +179,7 @@ export default function Home() {
             is_done: true,
           },
           {
-            id: 'demo_t4',
+            id: ensureUUID(),
             date: dateStr,
             text: 'Submit Team Status Report',
             priority: 2,
@@ -190,7 +191,7 @@ export default function Home() {
 
         const demoEvents: Event[] = [
           {
-            id: 'demo_e1',
+            id: ensureUUID(),
             date: dateStr,
             text: 'Austrian GP',
             start_time: '06:00',
@@ -201,7 +202,7 @@ export default function Home() {
             is_external: false,
           },
           {
-            id: 'demo_e2',
+            id: ensureUUID(),
             date: dateStr,
             text: 'Lunch with Family at noon',
             start_time: '12:00',
@@ -212,7 +213,7 @@ export default function Home() {
             is_external: false,
           },
           {
-            id: 'demo_e3',
+            id: ensureUUID(),
             date: dateStr,
             text: 'Take out Trash Can',
             start_time: '16:00',
@@ -244,7 +245,7 @@ export default function Home() {
         const externalCalendarEvents = fetchedEvents.filter((e) => e.is_external || !!e.calendar_name);
 
         const convertedTasks: Task[] = localUserEvents.map((e) => ({
-          id: e.id,
+          id: ensureUUID(e.id),
           date: e.date,
           text: e.text,
           priority: e.priority,
@@ -272,6 +273,51 @@ export default function Home() {
 
   useEffect(() => {
     loadDailyData(currentDateStr);
+  }, [currentDateStr, loadDailyData]);
+
+  // Real-time synchronization across browsers (Supabase Realtime) and tabs (BroadcastChannel / Local Events)
+  useEffect(() => {
+    const supabase = createClient();
+    let channel: any = null;
+
+    if (supabase) {
+      channel = supabase
+        .channel('atelier_db_changes')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public' },
+          () => {
+            loadDailyData(currentDateStr);
+          }
+        )
+        .subscribe();
+    }
+
+    const handleLocalSync = () => {
+      loadDailyData(currentDateStr);
+    };
+
+    window.addEventListener('atelier_local_sync', handleLocalSync);
+
+    let bc: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      bc = new BroadcastChannel('atelier_sync_channel');
+      bc.onmessage = (e) => {
+        if (e.data?.type === 'DATA_UPDATED') {
+          loadDailyData(currentDateStr);
+        }
+      };
+    }
+
+    return () => {
+      if (supabase && channel) {
+        supabase.removeChannel(channel);
+      }
+      window.removeEventListener('atelier_local_sync', handleLocalSync);
+      if (bc) {
+        bc.close();
+      }
+    };
   }, [currentDateStr, loadDailyData]);
 
   // Handlers for Calendar Feeds
@@ -310,14 +356,16 @@ export default function Home() {
     const externalEvents = await syncExternalFeeds(currentDateStr, feeds);
     const localEvents = await store.getEvents(currentDateStr);
     setEvents([...localEvents, ...externalEvents].sort((a, b) => a.start_time.localeCompare(b.start_time)));
-  };  // Handlers for Smart NLP Input Modal: Save items as Tasks or Events based on tab selection
+  };
+
+  // Handlers for Smart NLP Input Modal: Save items as Tasks or Events based on tab selection
   const handleAddItem = async (item: ParsedItem) => {
     const targetDateStr = item.targetDate || currentDateStr;
 
     if (item.type === 'event') {
       const activeFeed = feeds.find((f) => f.enabled) || feeds[0];
       const newEvent: Event = {
-        id: 'evt_' + Math.random().toString(36).substring(2, 9),
+        id: ensureUUID(),
         date: targetDateStr,
         text: item.text,
         start_time: item.startTime || '09:00',
@@ -338,7 +386,7 @@ export default function Home() {
       }
     } else {
       const newTask: Task = {
-        id: 'tsk_' + Math.random().toString(36).substring(2, 9),
+        id: ensureUUID(),
         date: targetDateStr,
         text: item.text,
         priority: item.priority,

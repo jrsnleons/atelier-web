@@ -88,3 +88,7 @@ CREATE POLICY "Users access own tasks" ON tasks FOR ALL USING (auth.uid() = user
 CREATE POLICY "Users access own events" ON events FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users access own feeds" ON calendar_feeds FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users access own lists" ON lists FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- Enable Supabase Realtime Engine for cross-browser synchronization
+ALTER PUBLICATION supabase_realtime ADD TABLE tasks, events, notes, lists, calendar_feeds;
+

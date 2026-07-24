@@ -1,9 +1,16 @@
 # Atelier Web — Build Status & Handoff
 
-## Current Phase: Phase 20 — Brand Overhaul to "Atelier" Complete
-## Current Step: Development Server Running (`http://localhost:3000`)
+## Current Phase: Phase 21 — Realtime Cross-Browser & Multi-Tab Agenda Syncing Complete
+## Current Step: Development Server Ready (`http://localhost:3000`)
 
 ## ✅ Completed Steps
+- [x] **[REALTIME & MULTI-BROWSER SYNC] Fixed Agenda Syncing Bugs**:
+  - Replaced non-UUID string IDs with PostgreSQL valid UUIDs (`ensureUUID()`) across tasks, events, and demo data
+  - Fixed `notes` table upsert `onConflict` clause (`user_id, date`) in `DataStore`
+  - Added Supabase Realtime Postgres Changes channel subscription (`postgres_changes` on `public` schema)
+  - Implemented `BroadcastChannel` (`atelier_sync_channel`) & `CustomEvent` (`atelier_local_sync`) for instant tab-to-tab synchronization
+  - Added Realtime publication setup (`ALTER PUBLICATION supabase_realtime ADD TABLE ...`) to `schema.sql`
+  - Verified full TypeScript compilation and production build (`npm run build`)
 - [x] **[NEW BRANDING] Rebranded to "Atelier"**:
   - Editorial, quiet luxury studio & daily workspace aesthetic
   - Updated metadata, PWA manifest, document title, and open graph branding

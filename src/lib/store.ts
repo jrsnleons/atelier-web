@@ -4,6 +4,40 @@ import { DEFAULT_LISTS } from './lists';
 
 const STORAGE_PREFIX = 'atelier_v1_';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isValidUUID(id?: string | null): boolean {
+  if (!id) return false;
+  return UUID_REGEX.test(id);
+}
+
+export function ensureUUID(id?: string | null): string {
+  if (id && isValidUUID(id)) return id;
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+function notifyLocalTabSync() {
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(new CustomEvent('atelier_local_sync'));
+      if ('BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('atelier_sync_channel');
+        bc.postMessage({ type: 'DATA_UPDATED' });
+        bc.close();
+      }
+    } catch {
+      // Ignore broadcast errors
+    }
+  }
+}
+
 export class DataStore {
   private static instance: DataStore;
 
@@ -60,13 +94,17 @@ export class DataStore {
         updated = [...existing, feed];
       }
       localStorage.setItem(`${STORAGE_PREFIX}calendar_feeds`, JSON.stringify(updated));
+      notifyLocalTabSync();
     }
 
     const supabase = this.getSupabase();
     if (supabase) {
       try {
+        const authRes = await supabase.auth.getUser();
+        const userId = authRes?.data?.user?.id;
         await supabase.from('calendar_feeds').upsert({
           id: feed.id,
+          user_id: userId,
           name: feed.name,
           color: feed.color,
           url: feed.url,
@@ -83,6 +121,7 @@ export class DataStore {
       const existing = await this.getCalendarFeeds();
       const filtered = existing.filter((f) => f.id !== id);
       localStorage.setItem(`${STORAGE_PREFIX}calendar_feeds`, JSON.stringify(filtered));
+      notifyLocalTabSync();
     }
 
     const supabase = this.getSupabase();
@@ -135,13 +174,17 @@ export class DataStore {
         updated = [...existing, list];
       }
       localStorage.setItem(`${STORAGE_PREFIX}lists`, JSON.stringify(updated));
+      notifyLocalTabSync();
     }
 
     const supabase = this.getSupabase();
     if (supabase) {
       try {
+        const authRes = await supabase.auth.getUser();
+        const userId = authRes?.data?.user?.id;
         await supabase.from('lists').upsert({
           id: list.id,
+          user_id: userId,
           name: list.name,
           color: list.color,
         });
@@ -156,6 +199,7 @@ export class DataStore {
       const existing = await this.getLists();
       const filtered = existing.filter((l) => l.id !== id);
       localStorage.setItem(`${STORAGE_PREFIX}lists`, JSON.stringify(filtered));
+      notifyLocalTabSync();
     }
 
     const supabase = this.getSupabase();
@@ -210,19 +254,31 @@ export class DataStore {
 
     if (typeof window !== 'undefined') {
       localStorage.setItem(`${STORAGE_PREFIX}note_${dateStr}`, JSON.stringify(noteObj));
+      notifyLocalTabSync();
     }
 
     const supabase = this.getSupabase();
     if (supabase) {
       try {
-        await supabase.from('notes').upsert(
-          {
+        const authRes = await supabase.auth.getUser();
+        const userId = authRes?.data?.user?.id;
+        if (userId) {
+          await supabase.from('notes').upsert(
+            {
+              user_id: userId,
+              date: dateStr,
+              content,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'user_id, date' }
+          );
+        } else {
+          await supabase.from('notes').upsert({
             date: dateStr,
             content,
             updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'date' }
-        );
+          });
+        }
       } catch (e) {
         console.warn('Failed to sync note to Supabase:', e);
       }
@@ -264,34 +320,41 @@ export class DataStore {
   }
 
   public async saveTask(task: Task): Promise<void> {
+    const validId = ensureUUID(task.id);
+    const taskToSave: Task = { ...task, id: validId };
+
     if (typeof window !== 'undefined') {
-      const existing = await this.getTasks(task.date);
-      const idx = existing.findIndex((t) => t.id === task.id);
+      const existing = await this.getTasks(taskToSave.date);
+      const idx = existing.findIndex((t) => t.id === taskToSave.id || (task.id && t.id === task.id));
       let updated: Task[];
       if (idx >= 0) {
         updated = [...existing];
-        updated[idx] = task;
+        updated[idx] = taskToSave;
       } else {
-        updated = [...existing, task];
+        updated = [...existing, taskToSave];
       }
-      localStorage.setItem(`${STORAGE_PREFIX}tasks_${task.date}`, JSON.stringify(updated));
+      localStorage.setItem(`${STORAGE_PREFIX}tasks_${taskToSave.date}`, JSON.stringify(updated));
+      notifyLocalTabSync();
     }
 
     const supabase = this.getSupabase();
     if (supabase) {
       try {
+        const authRes = await supabase.auth.getUser();
+        const userId = authRes?.data?.user?.id;
         await supabase.from('tasks').upsert({
-          id: task.id,
-          date: task.date,
-          text: task.text,
-          priority: task.priority,
-          list_tag: task.list_tag,
-          list_id: task.list_id,
-          is_done: task.is_done,
-          start_time: task.start_time,
-          end_time: task.end_time,
-          sort_order: task.sort_order ?? 0,
-          subtasks: task.subtasks || [],
+          id: taskToSave.id,
+          user_id: userId,
+          date: taskToSave.date,
+          text: taskToSave.text,
+          priority: taskToSave.priority,
+          list_tag: taskToSave.list_tag,
+          list_id: taskToSave.list_id,
+          is_done: taskToSave.is_done,
+          start_time: taskToSave.start_time,
+          end_time: taskToSave.end_time,
+          sort_order: taskToSave.sort_order ?? 0,
+          subtasks: taskToSave.subtasks || [],
         });
       } catch (e) {
         console.warn('Supabase task save error:', e);
@@ -304,6 +367,7 @@ export class DataStore {
       const existing = await this.getTasks(dateStr);
       const filtered = existing.filter((t) => t.id !== id);
       localStorage.setItem(`${STORAGE_PREFIX}tasks_${dateStr}`, JSON.stringify(filtered));
+      notifyLocalTabSync();
     }
 
     const supabase = this.getSupabase();
@@ -350,31 +414,38 @@ export class DataStore {
   }
 
   public async saveEvent(event: Event): Promise<void> {
+    const validId = ensureUUID(event.id);
+    const eventToSave: Event = { ...event, id: validId };
+
     if (typeof window !== 'undefined') {
-      const existing = await this.getEvents(event.date);
-      const idx = existing.findIndex((e) => e.id === event.id);
+      const existing = await this.getEvents(eventToSave.date);
+      const idx = existing.findIndex((e) => e.id === eventToSave.id || (event.id && e.id === event.id));
       let updated: Event[];
       if (idx >= 0) {
         updated = [...existing];
-        updated[idx] = event;
+        updated[idx] = eventToSave;
       } else {
-        updated = [...existing, event];
+        updated = [...existing, eventToSave];
       }
       updated.sort((a, b) => a.start_time.localeCompare(b.start_time));
-      localStorage.setItem(`${STORAGE_PREFIX}events_${event.date}`, JSON.stringify(updated));
+      localStorage.setItem(`${STORAGE_PREFIX}events_${eventToSave.date}`, JSON.stringify(updated));
+      notifyLocalTabSync();
     }
 
     const supabase = this.getSupabase();
     if (supabase) {
       try {
+        const authRes = await supabase.auth.getUser();
+        const userId = authRes?.data?.user?.id;
         await supabase.from('events').upsert({
-          id: event.id,
-          date: event.date,
-          text: event.text,
-          start_time: event.start_time,
-          end_time: event.end_time,
-          priority: event.priority,
-          list_tag: event.list_tag,
+          id: eventToSave.id,
+          user_id: userId,
+          date: eventToSave.date,
+          text: eventToSave.text,
+          start_time: eventToSave.start_time,
+          end_time: eventToSave.end_time,
+          priority: eventToSave.priority,
+          list_tag: eventToSave.list_tag,
         });
       } catch (e) {
         console.warn('Supabase event save error:', e);
@@ -387,6 +458,7 @@ export class DataStore {
       const existing = await this.getEvents(dateStr);
       const filtered = existing.filter((e) => e.id !== id);
       localStorage.setItem(`${STORAGE_PREFIX}events_${dateStr}`, JSON.stringify(filtered));
+      notifyLocalTabSync();
     }
 
     const supabase = this.getSupabase();

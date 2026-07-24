@@ -1,4 +1,4 @@
-import { DataStore } from './store';
+import { DataStore, ensureUUID } from './store';
 import { Task, Event, CalendarFeed, ListCategory } from './supabase/types';
 
 const STORAGE_PREFIX = 'atelier_v1_';
@@ -54,7 +54,7 @@ export async function migrateLocalDataToCloud(userId: string): Promise<boolean> 
           try {
             const tasks: Task[] = JSON.parse(raw);
             for (const task of tasks) {
-              await store.saveTask(task);
+              await store.saveTask({ ...task, id: ensureUUID(task.id) });
               itemsMigrated++;
             }
           } catch (e) {
@@ -67,7 +67,7 @@ export async function migrateLocalDataToCloud(userId: string): Promise<boolean> 
           try {
             const events: Event[] = JSON.parse(raw);
             for (const event of events) {
-              await store.saveEvent(event);
+              await store.saveEvent({ ...event, id: ensureUUID(event.id) });
               itemsMigrated++;
             }
           } catch (e) {
