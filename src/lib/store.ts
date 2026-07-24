@@ -59,9 +59,13 @@ export class DataStore {
     const supabase = this.getSupabase();
     if (supabase) {
       try {
-        const { data, error } = await supabase.from('calendar_feeds').select('*');
-        if (!error && data && data.length > 0) {
-          return data as CalendarFeed[];
+        const authRes = await supabase.auth.getUser();
+        const user = authRes?.data?.user;
+        if (user) {
+          const { data, error } = await supabase.from('calendar_feeds').select('*');
+          if (!error && data && data.length > 0) {
+            return data as CalendarFeed[];
+          }
         }
       } catch (e) {
         console.warn('Supabase fetch feeds error:', e);
@@ -102,14 +106,16 @@ export class DataStore {
       try {
         const authRes = await supabase.auth.getUser();
         const userId = authRes?.data?.user?.id;
-        await supabase.from('calendar_feeds').upsert({
-          id: feed.id,
-          user_id: userId,
-          name: feed.name,
-          color: feed.color,
-          url: feed.url,
-          enabled: feed.enabled,
-        });
+        if (userId) {
+          await supabase.from('calendar_feeds').upsert({
+            id: feed.id,
+            user_id: userId,
+            name: feed.name,
+            color: feed.color,
+            url: feed.url,
+            enabled: feed.enabled,
+          });
+        }
       } catch (e) {
         console.warn('Supabase feed save error:', e);
       }
@@ -127,7 +133,11 @@ export class DataStore {
     const supabase = this.getSupabase();
     if (supabase) {
       try {
-        await supabase.from('calendar_feeds').delete().eq('id', id);
+        const authRes = await supabase.auth.getUser();
+        const userId = authRes?.data?.user?.id;
+        if (userId) {
+          await supabase.from('calendar_feeds').delete().eq('id', id);
+        }
       } catch (e) {
         console.warn('Supabase feed delete error:', e);
       }
@@ -139,9 +149,13 @@ export class DataStore {
     const supabase = this.getSupabase();
     if (supabase) {
       try {
-        const { data, error } = await supabase.from('lists').select('*');
-        if (!error && data && data.length > 0) {
-          return data as ListCategory[];
+        const authRes = await supabase.auth.getUser();
+        const user = authRes?.data?.user;
+        if (user) {
+          const { data, error } = await supabase.from('lists').select('*');
+          if (!error && data && data.length > 0) {
+            return data as ListCategory[];
+          }
         }
       } catch (e) {
         console.warn('Supabase fetch lists error:', e);
@@ -182,12 +196,14 @@ export class DataStore {
       try {
         const authRes = await supabase.auth.getUser();
         const userId = authRes?.data?.user?.id;
-        await supabase.from('lists').upsert({
-          id: list.id,
-          user_id: userId,
-          name: list.name,
-          color: list.color,
-        });
+        if (userId) {
+          await supabase.from('lists').upsert({
+            id: list.id,
+            user_id: userId,
+            name: list.name,
+            color: list.color,
+          });
+        }
       } catch (e) {
         console.warn('Supabase list save error:', e);
       }
@@ -205,7 +221,11 @@ export class DataStore {
     const supabase = this.getSupabase();
     if (supabase) {
       try {
-        await supabase.from('lists').delete().eq('id', id);
+        const authRes = await supabase.auth.getUser();
+        const userId = authRes?.data?.user?.id;
+        if (userId) {
+          await supabase.from('lists').delete().eq('id', id);
+        }
       } catch (e) {
         console.warn('Supabase list delete error:', e);
       }
@@ -217,14 +237,18 @@ export class DataStore {
     const supabase = this.getSupabase();
     if (supabase) {
       try {
-        const { data, error } = await supabase
-          .from('notes')
-          .select('*')
-          .eq('date', dateStr)
-          .maybeSingle();
+        const authRes = await supabase.auth.getUser();
+        const user = authRes?.data?.user;
+        if (user) {
+          const { data, error } = await supabase
+            .from('notes')
+            .select('*')
+            .eq('date', dateStr)
+            .maybeSingle();
 
-        if (!error && data) {
-          return data as Note;
+          if (!error && data) {
+            return data as Note;
+          }
         }
       } catch (e) {
         console.warn('Supabase fetch note error, falling back to local:', e);
@@ -272,12 +296,6 @@ export class DataStore {
             },
             { onConflict: 'user_id, date' }
           );
-        } else {
-          await supabase.from('notes').upsert({
-            date: dateStr,
-            content,
-            updated_at: new Date().toISOString(),
-          });
         }
       } catch (e) {
         console.warn('Failed to sync note to Supabase:', e);
@@ -290,15 +308,22 @@ export class DataStore {
     const supabase = this.getSupabase();
     if (supabase) {
       try {
-        const { data, error } = await supabase
-          .from('tasks')
-          .select('*')
-          .eq('date', dateStr)
-          .order('priority', { ascending: false })
-          .order('created_at', { ascending: true });
+        const authRes = await supabase.auth.getUser();
+        const user = authRes?.data?.user;
+        if (user) {
+          const { data, error } = await supabase
+            .from('tasks')
+            .select('*')
+            .eq('date', dateStr)
+            .order('priority', { ascending: false })
+            .order('created_at', { ascending: true });
 
-        if (!error && data) {
-          return data as Task[];
+          if (!error && data) {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(`${STORAGE_PREFIX}tasks_${dateStr}`, JSON.stringify(data));
+            }
+            return data as Task[];
+          }
         }
       } catch (e) {
         console.warn('Supabase fetch tasks error:', e);
@@ -342,20 +367,22 @@ export class DataStore {
       try {
         const authRes = await supabase.auth.getUser();
         const userId = authRes?.data?.user?.id;
-        await supabase.from('tasks').upsert({
-          id: taskToSave.id,
-          user_id: userId,
-          date: taskToSave.date,
-          text: taskToSave.text,
-          priority: taskToSave.priority,
-          list_tag: taskToSave.list_tag,
-          list_id: taskToSave.list_id,
-          is_done: taskToSave.is_done,
-          start_time: taskToSave.start_time,
-          end_time: taskToSave.end_time,
-          sort_order: taskToSave.sort_order ?? 0,
-          subtasks: taskToSave.subtasks || [],
-        });
+        if (userId) {
+          await supabase.from('tasks').upsert({
+            id: taskToSave.id,
+            user_id: userId,
+            date: taskToSave.date,
+            text: taskToSave.text,
+            priority: taskToSave.priority,
+            list_tag: taskToSave.list_tag,
+            list_id: taskToSave.list_id,
+            is_done: taskToSave.is_done,
+            start_time: taskToSave.start_time,
+            end_time: taskToSave.end_time,
+            sort_order: taskToSave.sort_order ?? 0,
+            subtasks: taskToSave.subtasks || [],
+          });
+        }
       } catch (e) {
         console.warn('Supabase task save error:', e);
       }
@@ -373,7 +400,11 @@ export class DataStore {
     const supabase = this.getSupabase();
     if (supabase) {
       try {
-        await supabase.from('tasks').delete().eq('id', id);
+        const authRes = await supabase.auth.getUser();
+        const userId = authRes?.data?.user?.id;
+        if (userId) {
+          await supabase.from('tasks').delete().eq('id', id);
+        }
       } catch (e) {
         console.warn('Supabase task delete error:', e);
       }
@@ -385,14 +416,21 @@ export class DataStore {
     const supabase = this.getSupabase();
     if (supabase) {
       try {
-        const { data, error } = await supabase
-          .from('events')
-          .select('*')
-          .eq('date', dateStr)
-          .order('start_time', { ascending: true });
+        const authRes = await supabase.auth.getUser();
+        const user = authRes?.data?.user;
+        if (user) {
+          const { data, error } = await supabase
+            .from('events')
+            .select('*')
+            .eq('date', dateStr)
+            .order('start_time', { ascending: true });
 
-        if (!error && data) {
-          return data as Event[];
+          if (!error && data) {
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(`${STORAGE_PREFIX}events_${dateStr}`, JSON.stringify(data));
+            }
+            return data as Event[];
+          }
         }
       } catch (e) {
         console.warn('Supabase fetch events error:', e);
@@ -437,16 +475,18 @@ export class DataStore {
       try {
         const authRes = await supabase.auth.getUser();
         const userId = authRes?.data?.user?.id;
-        await supabase.from('events').upsert({
-          id: eventToSave.id,
-          user_id: userId,
-          date: eventToSave.date,
-          text: eventToSave.text,
-          start_time: eventToSave.start_time,
-          end_time: eventToSave.end_time,
-          priority: eventToSave.priority,
-          list_tag: eventToSave.list_tag,
-        });
+        if (userId) {
+          await supabase.from('events').upsert({
+            id: eventToSave.id,
+            user_id: userId,
+            date: eventToSave.date,
+            text: eventToSave.text,
+            start_time: eventToSave.start_time,
+            end_time: eventToSave.end_time,
+            priority: eventToSave.priority,
+            list_tag: eventToSave.list_tag,
+          });
+        }
       } catch (e) {
         console.warn('Supabase event save error:', e);
       }
@@ -464,7 +504,11 @@ export class DataStore {
     const supabase = this.getSupabase();
     if (supabase) {
       try {
-        await supabase.from('events').delete().eq('id', id);
+        const authRes = await supabase.auth.getUser();
+        const userId = authRes?.data?.user?.id;
+        if (userId) {
+          await supabase.from('events').delete().eq('id', id);
+        }
       } catch (e) {
         console.warn('Supabase event delete error:', e);
       }
