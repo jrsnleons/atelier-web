@@ -70,6 +70,16 @@ export default function RootLayout({
                   } else {
                     document.documentElement.classList.remove('dark');
                   }
+                  if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(function(regs) {
+                      for (let reg of regs) { reg.unregister(); }
+                    });
+                  }
+                  if ('caches' in window) {
+                    caches.keys().then(function(names) {
+                      for (let name of names) { caches.delete(name); }
+                    });
+                  }
                 } catch (e) {}
               })();
             `,

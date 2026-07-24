@@ -14,7 +14,6 @@ import { TaskEditSheet } from '@/components/task-edit-sheet';
 import { SettingsPanel } from '@/components/settings-panel';
 import { ExportModal } from '@/components/export-modal';
 import { OfflineIndicator } from '@/components/offline-indicator';
-import { PWAInstaller } from '@/components/pwa-installer';
 import { LandingPage } from '@/components/landing-page';
 import { UserMenu } from '@/components/user-menu';
 import { useAuth } from '@/lib/auth-context';
@@ -494,9 +493,6 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* PWA Install Button */}
-          <PWAInstaller />
-
           {/* User Profile & Sign In / Sign Out Menu */}
           <UserMenu />
         </div>
