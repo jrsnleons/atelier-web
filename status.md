@@ -4,9 +4,10 @@
 ## Current Step: Development Server Ready (`http://localhost:3000`)
 
 ## ✅ Completed Steps
-- [x] **[REALTIME & MULTI-BROWSER SYNC] Fixed Agenda Syncing Bugs**:
+- [x] **[REALTIME & MULTI-BROWSER SYNC] Fixed Agenda & Daily Note Syncing**:
   - Replaced non-UUID string IDs with PostgreSQL valid UUIDs (`ensureUUID()`) across tasks, events, and demo data
   - Fixed `notes` table upsert `onConflict` clause (`user_id, date`) in `DataStore`
+  - Fixed Daily Note page-refresh rehydration bug in `Scratchpad.tsx` when `initialContent` loads asynchronously
   - Added Supabase Realtime Postgres Changes channel subscription (`postgres_changes` on `public` schema)
   - Implemented `BroadcastChannel` (`atelier_sync_channel`) & `CustomEvent` (`atelier_local_sync`) for instant tab-to-tab synchronization
   - Added Realtime publication setup (`ALTER PUBLICATION supabase_realtime ADD TABLE ...`) to `schema.sql`
