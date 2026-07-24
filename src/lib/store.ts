@@ -305,6 +305,18 @@ export class DataStore {
 
   // --- TASKS ---
   public async getTasks(dateStr: string): Promise<Task[]> {
+    let localTasks: Task[] = [];
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem(`${STORAGE_PREFIX}tasks_${dateStr}`);
+      if (raw) {
+        try {
+          localTasks = JSON.parse(raw);
+        } catch {
+          localTasks = [];
+        }
+      }
+    }
+
     const supabase = this.getSupabase();
     if (supabase) {
       try {
@@ -319,10 +331,16 @@ export class DataStore {
             .order('created_at', { ascending: true });
 
           if (!error && data) {
+            const dbTasks = data as Task[];
+            const mergedMap = new Map<string, Task>();
+            localTasks.forEach((t) => mergedMap.set(t.id, t));
+            dbTasks.forEach((t) => mergedMap.set(t.id, t));
+
+            const merged = Array.from(mergedMap.values());
             if (typeof window !== 'undefined') {
-              localStorage.setItem(`${STORAGE_PREFIX}tasks_${dateStr}`, JSON.stringify(data));
+              localStorage.setItem(`${STORAGE_PREFIX}tasks_${dateStr}`, JSON.stringify(merged));
             }
-            return data as Task[];
+            return merged;
           }
         }
       } catch (e) {
@@ -330,18 +348,7 @@ export class DataStore {
       }
     }
 
-    if (typeof window !== 'undefined') {
-      const raw = localStorage.getItem(`${STORAGE_PREFIX}tasks_${dateStr}`);
-      if (raw) {
-        try {
-          return JSON.parse(raw);
-        } catch {
-          return [];
-        }
-      }
-    }
-
-    return [];
+    return localTasks;
   }
 
   public async saveTask(task: Task): Promise<void> {
@@ -359,7 +366,6 @@ export class DataStore {
         updated = [...existing, taskToSave];
       }
       localStorage.setItem(`${STORAGE_PREFIX}tasks_${taskToSave.date}`, JSON.stringify(updated));
-      notifyLocalTabSync();
     }
 
     const supabase = this.getSupabase();
@@ -387,6 +393,8 @@ export class DataStore {
         console.warn('Supabase task save error:', e);
       }
     }
+
+    notifyLocalTabSync();
   }
 
   public async deleteTask(id: string, dateStr: string): Promise<void> {
@@ -394,7 +402,6 @@ export class DataStore {
       const existing = await this.getTasks(dateStr);
       const filtered = existing.filter((t) => t.id !== id);
       localStorage.setItem(`${STORAGE_PREFIX}tasks_${dateStr}`, JSON.stringify(filtered));
-      notifyLocalTabSync();
     }
 
     const supabase = this.getSupabase();
@@ -409,10 +416,24 @@ export class DataStore {
         console.warn('Supabase task delete error:', e);
       }
     }
+
+    notifyLocalTabSync();
   }
 
   // --- EVENTS ---
   public async getEvents(dateStr: string): Promise<Event[]> {
+    let localEvents: Event[] = [];
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem(`${STORAGE_PREFIX}events_${dateStr}`);
+      if (raw) {
+        try {
+          localEvents = JSON.parse(raw);
+        } catch {
+          localEvents = [];
+        }
+      }
+    }
+
     const supabase = this.getSupabase();
     if (supabase) {
       try {
@@ -426,10 +447,18 @@ export class DataStore {
             .order('start_time', { ascending: true });
 
           if (!error && data) {
+            const dbEvents = data as Event[];
+            const mergedMap = new Map<string, Event>();
+            localEvents.forEach((e) => mergedMap.set(e.id, e));
+            dbEvents.forEach((e) => mergedMap.set(e.id, e));
+
+            const merged = Array.from(mergedMap.values()).sort((a, b) =>
+              a.start_time.localeCompare(b.start_time)
+            );
             if (typeof window !== 'undefined') {
-              localStorage.setItem(`${STORAGE_PREFIX}events_${dateStr}`, JSON.stringify(data));
+              localStorage.setItem(`${STORAGE_PREFIX}events_${dateStr}`, JSON.stringify(merged));
             }
-            return data as Event[];
+            return merged;
           }
         }
       } catch (e) {
@@ -437,18 +466,7 @@ export class DataStore {
       }
     }
 
-    if (typeof window !== 'undefined') {
-      const raw = localStorage.getItem(`${STORAGE_PREFIX}events_${dateStr}`);
-      if (raw) {
-        try {
-          return JSON.parse(raw);
-        } catch {
-          return [];
-        }
-      }
-    }
-
-    return [];
+    return localEvents;
   }
 
   public async saveEvent(event: Event): Promise<void> {
@@ -467,7 +485,6 @@ export class DataStore {
       }
       updated.sort((a, b) => a.start_time.localeCompare(b.start_time));
       localStorage.setItem(`${STORAGE_PREFIX}events_${eventToSave.date}`, JSON.stringify(updated));
-      notifyLocalTabSync();
     }
 
     const supabase = this.getSupabase();
@@ -491,6 +508,8 @@ export class DataStore {
         console.warn('Supabase event save error:', e);
       }
     }
+
+    notifyLocalTabSync();
   }
 
   public async deleteEvent(id: string, dateStr: string): Promise<void> {
@@ -498,7 +517,6 @@ export class DataStore {
       const existing = await this.getEvents(dateStr);
       const filtered = existing.filter((e) => e.id !== id);
       localStorage.setItem(`${STORAGE_PREFIX}events_${dateStr}`, JSON.stringify(filtered));
-      notifyLocalTabSync();
     }
 
     const supabase = this.getSupabase();
@@ -513,6 +531,8 @@ export class DataStore {
         console.warn('Supabase event delete error:', e);
       }
     }
+
+    notifyLocalTabSync();
   }
   // --- WORKSPACE DATA EXPORT ---
   public async exportAllData(): Promise<{
